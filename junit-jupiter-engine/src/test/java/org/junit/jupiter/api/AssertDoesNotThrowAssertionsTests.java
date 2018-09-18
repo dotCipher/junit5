@@ -13,10 +13,13 @@ package org.junit.jupiter.api;
 import static org.junit.jupiter.api.AssertionTestUtils.assertMessageEquals;
 import static org.junit.jupiter.api.AssertionTestUtils.expectAssertionFailedError;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
+import java.util.concurrent.FutureTask;
 
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.api.function.ThrowingSupplier;
 import org.opentest4j.AssertionFailedError;
 
 /**
@@ -29,25 +32,72 @@ class AssertDoesNotThrowAssertionsTests {
 	private static final Executable nix = () -> {
 	};
 
+	private static final ThrowingSupplier<String> something = () -> "enigma";
+
 	@Test
-	void assertDoesNotThrowAnything() {
+	void assertDoesNotThrowWithMethodReferenceForNonVoidReturnType() {
+		FutureTask<String> future = new FutureTask<>(() -> {
+			return "foo";
+		});
+		future.run();
+
+		String result;
+
+		// Current compiler's type inference: does NOT compile since the compiler
+		// cannot figure out which overloaded variant of assertDoesNotThrow() to
+		// invoke (i.e., Executable vs. ThrowingSupplier).
+		//
+		// result = assertDoesNotThrow(future::get);
+
+		// Explicitly as an Executable
+		assertDoesNotThrow((Executable) future::get);
+
+		// Explicitly as a ThrowingSupplier
+		result = assertDoesNotThrow((ThrowingSupplier<String>) future::get);
+		assertEquals("foo", result);
+	}
+
+	@Test
+	void assertDoesNotThrowWithMethodReferenceForVoidReturnType() {
+		var foo = new Foo();
+
+		// Note: the following does not compile since the compiler cannot properly
+		// perform type inference for a method reference for an overloaded method
+		// that has a void return type such as Foo.overloaded(...), IFF the
+		// compiler is simultaneously trying to pick which overloaded variant
+		// of assertDoesNotThrow() to invoke.
+		//
+		// assertDoesNotThrow(foo::overloaded);
+
+		// Current compiler's type inference
+		assertDoesNotThrow(foo::normalMethod);
+
+		// Explicitly as an Executable
+		assertDoesNotThrow((Executable) foo::normalMethod);
+		assertDoesNotThrow((Executable) foo::overloaded);
+	}
+
+	// --- executable ----------------------------------------------------------
+
+	@Test
+	void assertDoesNotThrowAnythingWithExecutable() {
 		assertDoesNotThrow(nix);
 	}
 
 	@Test
-	void assertDoesNotThrowAnythingWithMessage() {
+	void assertDoesNotThrowAnythingWithExecutableAndMessage() {
 		assertDoesNotThrow(nix, "message");
 	}
 
 	@Test
-	void assertDoesNotThrowAnythingWithMessageSupplier() {
+	void assertDoesNotThrowAnythingWithExecutableAndMessageSupplier() {
 		assertDoesNotThrow(nix, () -> "message");
 	}
 
 	@Test
 	void assertDoesNotThrowWithExecutableThatThrowsACheckedException() {
 		try {
-			assertDoesNotThrow(() -> {
+			assertDoesNotThrow((Executable) () -> {
 				throw new IOException();
 			});
 			expectAssertionFailedError();
@@ -60,7 +110,7 @@ class AssertDoesNotThrowAssertionsTests {
 	@Test
 	void assertDoesNotThrowWithExecutableThatThrowsARuntimeException() {
 		try {
-			assertDoesNotThrow(() -> {
+			assertDoesNotThrow((Executable) () -> {
 				throw new IllegalStateException();
 			});
 			expectAssertionFailedError();
@@ -73,7 +123,7 @@ class AssertDoesNotThrowAssertionsTests {
 	@Test
 	void assertDoesNotThrowWithExecutableThatThrowsAnError() {
 		try {
-			assertDoesNotThrow(AssertionTestUtils::recurseIndefinitely);
+			assertDoesNotThrow((Executable) AssertionTestUtils::recurseIndefinitely);
 			expectAssertionFailedError();
 		}
 		catch (AssertionFailedError ex) {
@@ -84,7 +134,7 @@ class AssertDoesNotThrowAssertionsTests {
 	@Test
 	void assertDoesNotThrowWithExecutableThatThrowsAnExceptionWithMessageString() {
 		try {
-			assertDoesNotThrow(() -> {
+			assertDoesNotThrow((Executable) () -> {
 				throw new IllegalStateException();
 			}, "Custom message");
 			expectAssertionFailedError();
@@ -98,7 +148,7 @@ class AssertDoesNotThrowAssertionsTests {
 	@Test
 	void assertDoesNotThrowWithExecutableThatThrowsAnExceptionWithMessageSupplier() {
 		try {
-			assertDoesNotThrow(() -> {
+			assertDoesNotThrow((Executable) () -> {
 				throw new IllegalStateException();
 			}, () -> "Custom message");
 			expectAssertionFailedError();
@@ -107,6 +157,106 @@ class AssertDoesNotThrowAssertionsTests {
 			assertMessageEquals(ex,
 				"Custom message ==> Unexpected exception thrown: " + IllegalStateException.class.getName());
 		}
+	}
+
+	// --- supplier ------------------------------------------------------------
+
+	@Test
+	void assertDoesNotThrowAnythingWithSupplier() {
+		assertEquals("enigma", assertDoesNotThrow(something));
+	}
+
+	@Test
+	void assertDoesNotThrowAnythingWithSupplierAndMessage() {
+		assertEquals("enigma", assertDoesNotThrow(something, "message"));
+	}
+
+	@Test
+	void assertDoesNotThrowAnythingWithSupplierAndMessageSupplier() {
+		assertEquals("enigma", assertDoesNotThrow(something, () -> "message"));
+	}
+
+	@Test
+	void assertDoesNotThrowWithSupplierThatThrowsACheckedException() {
+		try {
+			assertDoesNotThrow((ThrowingSupplier<?>) () -> {
+				throw new IOException();
+			});
+			expectAssertionFailedError();
+		}
+		catch (AssertionFailedError ex) {
+			assertMessageEquals(ex, "Unexpected exception thrown: " + IOException.class.getName());
+		}
+	}
+
+	@Test
+	void assertDoesNotThrowWithSupplierThatThrowsARuntimeException() {
+		try {
+			assertDoesNotThrow((ThrowingSupplier<?>) () -> {
+				throw new IllegalStateException();
+			});
+			expectAssertionFailedError();
+		}
+		catch (AssertionFailedError ex) {
+			assertMessageEquals(ex, "Unexpected exception thrown: " + IllegalStateException.class.getName());
+		}
+	}
+
+	@Test
+	void assertDoesNotThrowWithSupplierThatThrowsAnError() {
+		try {
+			assertDoesNotThrow((ThrowingSupplier<?>) () -> {
+				throw new StackOverflowError();
+			});
+			expectAssertionFailedError();
+		}
+		catch (AssertionFailedError ex) {
+			assertMessageEquals(ex, "Unexpected exception thrown: " + StackOverflowError.class.getName());
+		}
+	}
+
+	@Test
+	void assertDoesNotThrowWithSupplierThatThrowsAnExceptionWithMessageString() {
+		try {
+			assertDoesNotThrow((ThrowingSupplier<?>) () -> {
+				throw new IllegalStateException();
+			}, "Custom message");
+			expectAssertionFailedError();
+		}
+		catch (AssertionFailedError ex) {
+			assertMessageEquals(ex,
+				"Custom message ==> Unexpected exception thrown: " + IllegalStateException.class.getName());
+		}
+	}
+
+	@Test
+	void assertDoesNotThrowWithSupplierThatThrowsAnExceptionWithMessageSupplier() {
+		try {
+			assertDoesNotThrow((ThrowingSupplier<?>) () -> {
+				throw new IllegalStateException();
+			}, () -> "Custom message");
+			expectAssertionFailedError();
+		}
+		catch (AssertionFailedError ex) {
+			assertMessageEquals(ex,
+				"Custom message ==> Unexpected exception thrown: " + IllegalStateException.class.getName());
+		}
+	}
+
+	// -------------------------------------------------------------------------
+
+	private static class Foo {
+
+		void normalMethod() {
+		}
+
+		void overloaded() {
+		}
+
+		@SuppressWarnings("unused")
+		void overloaded(int i) {
+		}
+
 	}
 
 }

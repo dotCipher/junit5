@@ -32,11 +32,9 @@ import org.junit.platform.commons.util.ReflectionUtils;
 @API(status = MAINTAINED, since = "1.0")
 public final class ReflectionSupport {
 
-	///CLOVER:OFF
 	private ReflectionSupport() {
 		/* no-op */
 	}
-	///CLOVER:ON
 
 	/**
 	 * Load a class by its <em>primitive name</em> or <em>fully qualified name</em>,
@@ -44,7 +42,7 @@ public final class ReflectionSupport {
 	 *
 	 * <p>Class names for arrays may be specified using either the JVM's internal
 	 * String representation (e.g., {@code [[I} for {@code int[][]},
-	 * {@code [Lava.lang.String;} for {@code java.lang.String[]}, etc.) or
+	 * {@code [Ljava.lang.String;} for {@code java.lang.String[]}, etc.) or
 	 * <em>source code syntax</em> (e.g., {@code int[][]}, {@code java.lang.String[]},
 	 * etc.).
 	 *

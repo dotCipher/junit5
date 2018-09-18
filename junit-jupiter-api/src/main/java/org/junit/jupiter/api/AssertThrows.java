@@ -28,11 +28,9 @@ import org.opentest4j.AssertionFailedError;
  */
 class AssertThrows {
 
-	///CLOVER:OFF
 	private AssertThrows() {
 		/* no-op */
 	}
-	///CLOVER:ON
 
 	static <T extends Throwable> T assertThrows(Class<T> expectedType, Executable executable) {
 		return assertThrows(expectedType, executable, (Object) null);
@@ -44,6 +42,7 @@ class AssertThrows {
 
 	static <T extends Throwable> T assertThrows(Class<T> expectedType, Executable executable,
 			Supplier<String> messageSupplier) {
+
 		return assertThrows(expectedType, executable, (Object) messageSupplier);
 	}
 

@@ -10,16 +10,20 @@
 
 package org.junit.jupiter.params;
 
+import static org.assertj.core.api.Assertions.allOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectMethod;
 import static org.junit.platform.engine.test.event.ExecutionEvent.Type.DYNAMIC_TEST_REGISTERED;
+import static org.junit.platform.engine.test.event.ExecutionEventConditions.abortedWithReason;
 import static org.junit.platform.engine.test.event.ExecutionEventConditions.container;
 import static org.junit.platform.engine.test.event.ExecutionEventConditions.displayName;
 import static org.junit.platform.engine.test.event.ExecutionEventConditions.event;
 import static org.junit.platform.engine.test.event.ExecutionEventConditions.finishedWithFailure;
 import static org.junit.platform.engine.test.event.ExecutionEventConditions.test;
+import static org.junit.platform.engine.test.event.TestExecutionResultConditions.isA;
 import static org.junit.platform.engine.test.event.TestExecutionResultConditions.message;
 import static org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder.request;
 
@@ -31,12 +35,14 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
+import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.engine.JupiterTestEngine;
 import org.junit.jupiter.params.converter.ArgumentConversionException;
 import org.junit.jupiter.params.converter.ArgumentConverter;
@@ -52,6 +58,7 @@ import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.test.event.ExecutionEvent;
 import org.junit.platform.engine.test.event.ExecutionEventRecorder;
+import org.opentest4j.TestAbortedException;
 
 /**
  * @since 5.0
@@ -82,6 +89,14 @@ class ParameterizedTestIntegrationTests {
 			selectMethod(TestCase.class, "testWithEmptyMethodSource", String.class.getName()));
 		assertThat(executionEvents) //
 				.haveExactly(1, event(test(), finishedWithFailure(message("empty method source")))); //
+	}
+
+	@Test
+	void executesWithMethodSourceReturning2dObjectArray() {
+		List<ExecutionEvent> executionEvents = execute(selectMethod(TestCase.class,
+			"testWithMethodSourceReturning2dObjectArray", String.class.getName() + ", " + int.class.getName()));
+		assertThat(executionEvents) //
+				.haveExactly(1, event(test(), finishedWithFailure(message("foo:42")))); //
 	}
 
 	@Test
@@ -224,6 +239,25 @@ class ParameterizedTestIntegrationTests {
 					finishedWithFailure(message(value -> value.contains("must be declared with a non-empty name")))));
 	}
 
+	@Test
+	void reportsExceptionForErroneousConverter() {
+		List<ExecutionEvent> executionEvents = execute(
+			selectMethod(TestCase.class, "testWithErroneousConverter", Object.class.getName()));
+		assertThat(executionEvents) //
+				.haveExactly(1, event(test(), finishedWithFailure(allOf(isA(ParameterResolutionException.class), //
+					message("Error converting parameter at index 0: something went horribly wrong")))));
+	}
+
+	@Test
+	void reportsContainerWithAssumptionFailureInMethodSourceAsAborted() {
+		List<ExecutionEvent> executionEvents = execute(
+			selectMethod(AssumptionFailureInMethodSourceTestCase.class, "strings", String.class.getName()));
+		assertThat(executionEvents) //
+				.haveExactly(1, event(container("test-template:strings"), //
+					abortedWithReason(
+						allOf(isA(TestAbortedException.class), message("Assumption failed: nothing to test")))));
+	}
+
 	private List<ExecutionEvent> execute(DiscoverySelector... selectors) {
 		return ExecutionEventRecorder.execute(new JupiterTestEngine(), request().selectors(selectors).build());
 	}
@@ -279,8 +313,25 @@ class ParameterizedTestIntegrationTests {
 		}
 
 		static Stream<Arguments> testWithEmptyMethodSource() {
-			return Stream.of(Arguments.of("empty method source"));
+			return Stream.of(arguments("empty method source"));
 		}
+
+		@ParameterizedTest
+		@MethodSource("twoDimensionalObjectArray")
+		void testWithMethodSourceReturning2dObjectArray(String s, int x) {
+			fail(s + ":" + x);
+		}
+
+		static Object twoDimensionalObjectArray() {
+			return new Object[][] { { "foo", 42 } };
+		}
+
+		@ParameterizedTest
+		@ValueSource(ints = 42)
+		void testWithErroneousConverter(@ConvertWith(ErroneousConverter.class) Object ignored) {
+			fail("this should never be called");
+		}
+
 	}
 
 	static class UnusedParametersTestCase {
@@ -310,7 +361,7 @@ class ParameterizedTestIntegrationTests {
 		}
 
 		static Stream<Arguments> unusedArgumentsProviderMethod() {
-			return Stream.of(Arguments.of("foo", "unused1"), Arguments.of("bar", "unused2"));
+			return Stream.of(arguments("foo", "unused1"), arguments("bar", "unused2"));
 		}
 
 	}
@@ -374,7 +425,7 @@ class ParameterizedTestIntegrationTests {
 
 		@Override
 		public Stream<? extends Arguments> provideArguments(ExtensionContext context) throws Exception {
-			return Stream.of(Arguments.of("foo"), Arguments.of("bar"));
+			return Stream.of(arguments("foo"), arguments("bar"));
 		}
 	}
 
@@ -382,7 +433,7 @@ class ParameterizedTestIntegrationTests {
 
 		@Override
 		public Stream<? extends Arguments> provideArguments(ExtensionContext context) throws Exception {
-			return Stream.of(Arguments.of("foo", "unused1"), Arguments.of("bar", "unused2"));
+			return Stream.of(arguments("foo", "unused1"), arguments("bar", "unused2"));
 		}
 	}
 
@@ -391,6 +442,14 @@ class ParameterizedTestIntegrationTests {
 		@Override
 		public Object convert(Object source, ParameterContext context) throws ArgumentConversionException {
 			return String.valueOf(source).length();
+		}
+	}
+
+	private static class ErroneousConverter implements ArgumentConverter {
+
+		@Override
+		public Object convert(Object source, ParameterContext context) throws ArgumentConversionException {
+			throw new ArgumentConversionException("something went horribly wrong");
 		}
 	}
 
@@ -405,6 +464,20 @@ class ParameterizedTestIntegrationTests {
 		static Book factory(String title) {
 			return new Book(title);
 		}
+	}
+
+	static class AssumptionFailureInMethodSourceTestCase {
+
+		static List<String> strings() {
+			Assumptions.assumeFalse(true, "nothing to test");
+			return null;
+		}
+
+		@ParameterizedTest
+		@MethodSource
+		void strings(String test) {
+		}
+
 	}
 
 }
