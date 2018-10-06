@@ -41,12 +41,12 @@ import org.junit.platform.engine.discovery.MethodSelector;
 import org.junit.platform.engine.discovery.ModuleSelector;
 import org.junit.platform.engine.discovery.PackageSelector;
 import org.junit.platform.engine.discovery.UniqueIdSelector;
-import org.junit.platform.engine.test.TestEngineStub;
 import org.junit.platform.launcher.DiscoveryFilterStub;
 import org.junit.platform.launcher.EngineFilter;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.PostDiscoveryFilter;
 import org.junit.platform.launcher.PostDiscoveryFilterStub;
+import org.junit.platform.testkit.TestEngineStub;
 
 /**
  * @since 1.0
@@ -305,7 +305,7 @@ class LauncherDiscoveryRequestBuilderTests {
 		}
 
 		@Test
-		void multipleConfigurationParametersAddedByMap_areStoredInDiscoveryRequest() throws Exception {
+		void multipleConfigurationParametersAddedByMap_areStoredInDiscoveryRequest() {
 			Map<String, String> configurationParams = new HashMap<>();
 			configurationParams.put("key1", "value1");
 			configurationParams.put("key2", "value2");

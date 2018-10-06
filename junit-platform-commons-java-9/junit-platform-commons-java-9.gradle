@@ -6,7 +6,7 @@ dependencies {
 	testImplementation(project(':junit-platform-launcher'))
 	testImplementation(project(':junit-jupiter-api'))
 	testImplementation(project(':junit-jupiter-engine'))
-	testImplementation("junit:junit:${junit4Version}")
+	testImplementation("junit:junit:${Versions.junit4}")
 
 	// Required by :execNoJavaScripting
 	testRuntimeOnly(project(':junit-platform-console'))
@@ -15,11 +15,6 @@ dependencies {
 
 // Compiles against the public, supported and documented Java 9 API.
 javacRelease = 9
-
-// https://github.com/schauder/degraph/issues/87
-tasks.withType(de.obqo.gradle.degraph.DegraphTask) {
-	it.enabled = false
-}
 
 test {
 	useJUnitPlatform()
